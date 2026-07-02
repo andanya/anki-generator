@@ -1,0 +1,21 @@
+[project]
+name = "anki-generator"
+version = "0.1.0"
+description = "Generate Anki-ready card data from English frequency lists."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "jsonschema>=4.23.0",
+    "openai>=1.99.0",
+    "requests>=2.32.3",
+]
+
+[project.scripts]
+anki-generate-cards = "anki_generator.build_cards:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/anki_generator"]
