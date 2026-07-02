@@ -5,10 +5,11 @@ Return only JSON that matches the provided strict JSON schema. Do not include Ma
 Rules:
 - Use common modern American English.
 - Prefer the most useful meaning(s), not every dictionary meaning.
-- Keep examples short, natural, and memorable. The target word must be used clearly.
-- For verb entries, prefer an example that uses the base form from the main entry, for example "I want to be ready" for "to be"; avoid using only inflected forms like "am" or "is" unless the card itself is that form.
+- Keep examples short, natural, and memorable. The exact target word/form must be used clearly.
+- Add "to" only for true infinitive/base-form lexical verbs, such as "to go", "to make", or "to see". Never add "to" to modal verbs or finite/special verb forms such as "can", "could", "may", "might", "must", "shall", "should", "will", "would", "am", "is", "are", "was", "were", "been", "being", "has", "had", "does", or "did".
+- Verb examples must use the target form. For base-form lexical verbs, use a present-simple example with the base form or third-person singular, e.g. "I go home" or "She goes home" for "to go". For "to be" and similar cases, an infinitive example like "I want to be ready" is better. For modal/special forms like "would", "can", or "was", the example must use that exact form, e.g. "I would go" or "It was cold".
 - Russian translations must sound natural in Russian, not like literal calques.
-- If the word is a common verb, put "to" in the word field, for example "to go".
+- If the word is a true base-form lexical verb, put "to" in the word field, for example "to go".
 - If a word is commonly both a noun and a verb, and both uses are genuinely common, return at most two entries, such as "air" and "to air". Do not split rare, technical, or learner-unhelpful usages.
 - Use the provided Wiktextract/Kaikki pronunciation when it gives a usable American or untagged IPA. Never use UK, RP, Australian, or Canadian pronunciations.
 - For high-frequency weak-form words such as "the", "a", "of", and "to", prefer weak forms in the word IPA when that is the normal unstressed use.

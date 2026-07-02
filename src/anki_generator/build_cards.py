@@ -58,11 +58,52 @@ AMERICAN_PRONUNCIATION_TAGS = {
     "American",
     "United-States",
 }
+NO_TO_VERB_FORMS = {
+    "am",
+    "are",
+    "been",
+    "being",
+    "can",
+    "cannot",
+    "could",
+    "did",
+    "does",
+    "doing",
+    "done",
+    "had",
+    "has",
+    "is",
+    "may",
+    "might",
+    "must",
+    "ought",
+    "shall",
+    "should",
+    "was",
+    "were",
+    "will",
+    "would",
+}
 PRONUNCIATION_OVERRIDES = {
     "to": {"english_ipa": "/tu/", "pronunciation_notes": "Карточка использует полную форму; слабая форма /tə/ очень частая."},
-    "a": {"english_ipa": "/eɪ/", "pronunciation_notes": "Карточка использует полную форму; слабая форма /ə/ очень частая."},
+    "the": {"english_ipa": "/ðə/", "pronunciation_notes": "Обычная слабая форма."},
+    "a": {"english_ipa": "/ə/", "pronunciation_notes": "Обычная слабая форма."},
     "of": {"english_ipa": "/əv/", "pronunciation_notes": "Обычная слабая форма."},
     "with": {"english_ipa": "/wɪθ/", "pronunciation_notes": "Здесь используется вариант с глухим /θ/."},
+}
+WORD_AUDIO_TTS_OVERRIDES = {
+    "the": "Say only the weak form of the word 'the': /ðə/. It should rhyme with 'duh'. Do not say /ði/ or /ðiː/.",
+    "a": "Say only the weak form of the word 'a': /ə/. It should be one short schwa. Do not say the letter name /eɪ/.",
+    "of": "Say only the weak form of the word 'of': /əv/. Use schwa at the start. Do not say /ʌv/.",
+    "as": "Say only the weak form of the word 'as': /əz/. Use schwa at the start. Do not say /æz/.",
+    "with": "Say only /wɪθ/ with an unvoiced final /θ/. Do not say the voiced /wɪð/ variant.",
+}
+WORD_AUDIO_FILE_OVERRIDES = {
+    "the": "the-weak.mp3",
+    "a": "a-weak.mp3",
+    "of": "of-weak.mp3",
+    "as": "as-weak.mp3",
+    "with": "with-unvoiced.mp3",
 }
 EXAMPLE_OVERRIDES = {
     "to be": {
@@ -76,7 +117,7 @@ EXAMPLE_OVERRIDES = {
         "russian_example_translation": "Я хочу завести собаку.",
     },
 }
-FORCE_TTS_WORD_AUDIO = {"with"}
+FORCE_TTS_WORD_AUDIO = set(WORD_AUDIO_TTS_OVERRIDES)
 TTS_PROFILES = [
     {"voice": "coral", "persona": "Warm female tutor; clear, friendly, natural General American."},
     {"voice": "onyx", "persona": "Calm male narrator; clear, steady, natural General American."},
@@ -815,7 +856,13 @@ def is_unhelpful_entry(entry: dict[str, Any]) -> bool:
 
 def normalize_word_field(word: str, part_of_speech: str) -> str:
     clean_word = re.sub(r"\s+", " ", word.strip())
-    if part_of_speech == "verb" and not clean_word.casefold().startswith("to "):
+    lower_word = clean_word.casefold()
+    bare_word = lower_word[3:].strip() if lower_word.startswith("to ") else lower_word
+    if lower_word.startswith("to ") and bare_word in NO_TO_VERB_FORMS:
+        return clean_word[3:].strip()
+    if part_of_speech == "verb" and bare_word in NO_TO_VERB_FORMS:
+        return clean_word
+    if part_of_speech == "verb" and not lower_word.startswith("to "):
         return f"to {clean_word}"
     return clean_word
 
@@ -955,6 +1002,7 @@ def enrich_card(entry: dict[str, Any], row: InputRow, wiktionary: dict[str, Any]
     card["source_frequency"] = row.frequency
     card["created_at_utc"] = datetime.now(timezone.utc).isoformat()
     apply_pronunciation_override(card)
+    normalize_ipa_fields(card)
     return card
 
 
@@ -968,6 +1016,11 @@ def apply_pronunciation_override(card: dict[str, Any]) -> None:
     example_override = EXAMPLE_OVERRIDES.get(cache_key(card["word"]))
     if example_override:
         card.update(example_override)
+
+
+def normalize_ipa_fields(card: dict[str, Any]) -> None:
+    for field in ("english_ipa", "english_example_ipa"):
+        card[field] = card[field].replace("tʃ", "t͡ʃ")
 
 
 def attach_audio(
@@ -985,7 +1038,8 @@ def attach_audio(
         card["english_example_audio_source"] = "not_checked"
         return
 
-    audio_url = "" if cache_key(card["word"]) in FORCE_TTS_WORD_AUDIO else wiktionary.get("preferred_audio_url", "")
+    word_key = cache_key(card["word"])
+    audio_url = "" if word_key in FORCE_TTS_WORD_AUDIO else wiktionary.get("preferred_audio_url", "")
     if audio_url:
         try:
             audio_path = download_audio(audio_url, card["word"], args.audio_dir, args.request_timeout)
@@ -1000,10 +1054,11 @@ def attach_audio(
             audio_path = generate_tts_audio(
                 client=client,
                 text=card["word"],
-                path=args.audio_dir / f"{safe_slug(card['word'])}.mp3",
+                path=args.audio_dir / WORD_AUDIO_FILE_OVERRIDES.get(word_key, f"{safe_slug(card['word'])}.mp3"),
                 model=args.tts_model,
                 profile=tts_rotator.next(),
                 content_kind="word",
+                instructions_override=WORD_AUDIO_TTS_OVERRIDES.get(word_key),
             )
             card["audio_file_path"] = str(audio_path)
             card["audio_url"] = ""
@@ -1053,10 +1108,13 @@ def generate_tts_audio(
     model: str,
     profile: dict[str, str],
     content_kind: str,
+    instructions_override: str | None = None,
 ) -> Path:
     if path.exists() and path.stat().st_size > 0:
         return path
-    if content_kind == "example":
+    if instructions_override:
+        instructions = f"{profile['persona']} {instructions_override}"
+    elif content_kind == "example":
         instructions = f"{profile['persona']} Read the sentence once, naturally and clearly."
     else:
         instructions = f"{profile['persona']} Read the vocabulary item once, carefully and clearly."
